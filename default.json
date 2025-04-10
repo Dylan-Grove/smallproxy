@@ -1,0 +1,15 @@
+{
+    "whitelist": [
+        "google.com"
+    ],
+    "blacklist": [
+        "squareup.com",
+        "api.squareup.com",
+        "connect.squareup.com"
+    ],
+    "system": {
+        "blocking_enabled": true,
+        "proxy_enabled": true,
+        "whitelist_enabled": false
+    }
+} 

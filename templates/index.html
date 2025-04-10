@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmallProxy Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Toggle switch styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        /* Log styles */
+        .log-container {
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            font-size: 0.9rem;
+            height: calc(100vh - 180px);
+        }
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: #1a202c;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background-color: #4a5568;
+            border-radius: 4px;
+        }
+        
+        /* Log line colors */
+        .log-line-error { color: #f56565; }
+        .log-line-info { color: #f7fafc; }
+        .log-line-connect { color: #48bb78; }
+        .log-line-block { color: #ed8936; }
+        
+        /* Full height container */
+        .full-height-container {
+            min-height: calc(100vh - 120px);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto p-4">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold">SmallProxy Manager</h1>
+            <p class="text-gray-400">A lightweight proxy filter manager powered by <a href="https://tinyproxy.github.io/" target="_blank" class="text-blue-400 hover:underline">TinyProxy</a></p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 full-height-container">
+            <!-- Filters Panel (1/3 width) -->
+            <div class="bg-gray-800 p-5 rounded-lg shadow-lg md:col-span-1">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
+                    </svg>
+                    Manage Filters
+                </h2>
+                
+                <!-- System Controls -->
+                <div class="mb-5 bg-gray-700 p-3 rounded-lg">
+                    <h3 class="text-lg font-medium mb-3">System Controls</h3>
+                    <div class="flex items-center justify-between mb-2">
+                        <span>Blocking Enabled</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="blocking-toggle" checked onchange="toggleSystem('blocking_enabled', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span>Proxy Service</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="proxy-toggle" checked onchange="toggleSystem('proxy_enabled', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Use Whitelist Mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="whitelist-toggle" onchange="toggleSystem('whitelist_enabled', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="mt-3 text-xs text-gray-400">
+                        Note: Changes to system controls take effect immediately
+                    </div>
+                </div>
+
+                <!-- Filter list tabs -->
+                <div class="mb-4">
+                    <div class="border-b border-gray-700">
+                        <nav class="-mb-px flex">
+                            <button id="blacklist-tab" onclick="switchTab('blacklist')" 
+                                    class="py-2 px-4 border-b-2 border-transparent font-medium text-sm leading-5 text-gray-300 hover:text-white focus:outline-none">
+                                Blacklist
+                            </button>
+                            <button id="whitelist-tab" onclick="switchTab('whitelist')" 
+                                    class="py-2 px-4 border-b-2 border-transparent font-medium text-sm leading-5 text-gray-300 hover:text-white focus:outline-none">
+                                Whitelist
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+
+                <!-- Blacklist panel -->
+                <div id="blacklist-panel" class="mb-5">
+                    <div class="text-xs text-gray-400 mb-2">Sites on the blacklist will be blocked when blacklist mode is active</div>
+                    <div id="blacklist-filter-list" class="divide-y divide-gray-700 max-h-[30vh] overflow-y-auto">
+                        <!-- Blacklist filters will be dynamically loaded here -->
+                        <div class="py-2 text-gray-400">Loading filters...</div>
+                    </div>
+                    <div class="flex mb-2 mt-2">
+                        <input type="text" id="blacklist-new-filter" 
+                               class="flex-grow p-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="e.g., example.com">
+                        <button onclick="addFilter('blacklist')" 
+                                class="px-4 py-2 bg-blue-600 rounded-r-lg hover:bg-blue-700 transition-colors">
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Whitelist panel -->
+                <div id="whitelist-panel" class="mb-5 hidden">
+                    <div class="text-xs text-gray-400 mb-2">Only sites on the whitelist will be allowed when whitelist mode is active</div>
+                    <div id="whitelist-filter-list" class="divide-y divide-gray-700 max-h-[30vh] overflow-y-auto">
+                        <!-- Whitelist filters will be dynamically loaded here -->
+                        <div class="py-2 text-gray-400">Loading filters...</div>
+                    </div>
+                    <div class="flex mb-2 mt-2">
+                        <input type="text" id="whitelist-new-filter" 
+                               class="flex-grow p-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="e.g., example.com">
+                        <button onclick="addFilter('whitelist')" 
+                                class="px-4 py-2 bg-blue-600 rounded-r-lg hover:bg-blue-700 transition-colors">
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="saveChanges()" 
+                        class="w-full p-2 bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Save Changes
+                </button>
+                
+                <div id="status-message" class="mt-4 p-3 rounded-lg hidden"></div>
+            </div>
+
+            <!-- Logs Panel (2/3 width) -->
+            <div class="bg-gray-800 p-5 rounded-lg shadow-lg md:col-span-2">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                    Proxy Logs
+                </h2>
+                <div class="relative">
+                    <pre id="proxy-logs" class="log-container bg-gray-900 p-3 rounded-lg overflow-y-auto">Loading logs...</pre>
+                    <div class="absolute top-2 right-2 flex space-x-2">
+                        <button id="pauseBtn" onclick="toggleLogUpdates()" class="p-1 bg-yellow-600 hover:bg-yellow-700 rounded text-xs">
+                            Pause
+                        </button>
+                        <button onclick="clearLogs()" class="p-1 bg-red-600 hover:bg-red-700 rounded text-xs">
+                            Clear View
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-2 text-sm text-gray-400 flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg id="updateIndicator" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span id="updateStatus">Live updating every 2 seconds</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="flex items-center"><span class="w-3 h-3 bg-red-500 rounded-full inline-block mr-1"></span> Error</span>
+                        <span class="flex items-center"><span class="w-3 h-3 bg-white rounded-full inline-block mr-1"></span> Info</span>
+                        <span class="flex items-center"><span class="w-3 h-3 bg-green-500 rounded-full inline-block mr-1"></span> Connect</span>
+                        <span class="flex items-center"><span class="w-3 h-3 bg-orange-500 rounded-full inline-block mr-1"></span> Block</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center text-gray-500 text-sm py-4">
+            <p>SmallProxy &copy; 2025 - Based on <a href="https://tinyproxy.github.io/" target="_blank" class="text-blue-400 hover:underline">TinyProxy</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // API path prefix
+        const API_PATH = '/api';
+        
+        // State management
+        let whitelistFilters = [];
+        let blacklistFilters = [];
+        let activeFilters = [];
+        let lastLogLength = 0;
+        let statusTimeout;
+        let logUpdatesEnabled = true;
+        let logUpdateInterval;
+        let systemState = {
+            blocking_enabled: true,
+            proxy_enabled: true,
+            whitelist_enabled: false
+        };
+        let currentTab = 'blacklist';
+
+        // Tab switching
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab styling
+            document.getElementById('blacklist-tab').className = 
+                tab === 'blacklist' 
+                    ? 'py-2 px-4 border-b-2 border-blue-500 font-medium text-sm leading-5 text-blue-500 focus:outline-none'
+                    : 'py-2 px-4 border-b-2 border-transparent font-medium text-sm leading-5 text-gray-300 hover:text-white focus:outline-none';
+                    
+            document.getElementById('whitelist-tab').className = 
+                tab === 'whitelist' 
+                    ? 'py-2 px-4 border-b-2 border-blue-500 font-medium text-sm leading-5 text-blue-500 focus:outline-none'
+                    : 'py-2 px-4 border-b-2 border-transparent font-medium text-sm leading-5 text-gray-300 hover:text-white focus:outline-none';
+            
+            // Show/hide panels
+            document.getElementById('blacklist-panel').classList.toggle('hidden', tab !== 'blacklist');
+            document.getElementById('whitelist-panel').classList.toggle('hidden', tab !== 'whitelist');
+        }
+
+        // Filter operations
+        function loadFilters() {
+            fetch(`${API_PATH}/filters`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load filters');
+                    return response.json();
+                })
+                .then(data => {
+                    whitelistFilters = data.whitelist || [];
+                    blacklistFilters = data.blacklist || [];
+                    activeFilters = data.current || [];
+                    systemState = data.system || { 
+                        blocking_enabled: true, 
+                        proxy_enabled: true,
+                        whitelist_enabled: false
+                    };
+                    
+                    // Update system control toggles
+                    document.getElementById('blocking-toggle').checked = systemState.blocking_enabled;
+                    document.getElementById('proxy-toggle').checked = systemState.proxy_enabled;
+                    document.getElementById('whitelist-toggle').checked = systemState.whitelist_enabled;
+                    
+                    // Set default active tab based on mode
+                    switchTab(systemState.whitelist_enabled ? 'whitelist' : 'blacklist');
+                    
+                    // Render the filter lists
+                    renderFilters('whitelist');
+                    renderFilters('blacklist');
+                })
+                .catch(error => {
+                    showStatus('Error loading filters: ' + error.message, 'error');
+                    console.error('Error loading filters:', error);
+                });
+        }
+
+        function renderFilters(listType) {
+            const filterList = document.getElementById(`${listType}-filter-list`);
+            const filters = listType === 'whitelist' ? whitelistFilters : blacklistFilters;
+            
+            if (filters.length === 0) {
+                filterList.innerHTML = `<div class="py-3 text-gray-400">No ${listType} filters added yet.</div>`;
+                return;
+            }
+            
+            filterList.innerHTML = '';
+            filters.forEach((filter, index) => {
+                const filterDiv = document.createElement('div');
+                filterDiv.className = 'py-3';
+                
+                // In whitelist mode, the active filters are from the whitelist
+                // In blacklist mode, the active filters are from the blacklist
+                const isActive = systemState.whitelist_enabled 
+                    ? (listType === 'whitelist' && activeFilters.includes(filter))
+                    : (listType === 'blacklist' && activeFilters.includes(filter));
+                
+                filterDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <span class="font-medium">${filter}</span>
+                        </div>
+                        <button onclick="removeFilter('${filter}', '${listType}')" 
+                                class="text-red-500 hover:text-red-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                filterList.appendChild(filterDiv);
+            });
+        }
+
+        function addFilter(listType) {
+            const input = document.getElementById(`${listType}-new-filter`);
+            let newFilter = input.value.trim();
+            
+            if (!newFilter) {
+                showStatus(`Please enter a filter domain to ${listType}`, 'error');
+                return;
+            }
+            
+            // Clean up the input - remove protocol and paths
+            newFilter = newFilter.replace(/^https?:\/\//, '').split('/')[0];
+            
+            const filters = listType === 'whitelist' ? whitelistFilters : blacklistFilters;
+            
+            if (filters.includes(newFilter)) {
+                showStatus(`This filter already exists in the ${listType}`, 'error');
+                return;
+            }
+            
+            // Add to the appropriate list
+            if (listType === 'whitelist') {
+                whitelistFilters.push(newFilter);
+            } else {
+                blacklistFilters.push(newFilter);
+            }
+            
+            input.value = '';
+            renderFilters(listType);
+            showStatus(`Filter added to ${listType} - Remember to save changes`, 'success');
+        }
+
+        function removeFilter(filter, listType) {
+            const filters = listType === 'whitelist' ? whitelistFilters : blacklistFilters;
+            const index = filters.indexOf(filter);
+            
+            if (index > -1) {
+                if (listType === 'whitelist') {
+                    whitelistFilters.splice(index, 1);
+                } else {
+                    blacklistFilters.splice(index, 1);
+                }
+                
+                renderFilters(listType);
+                showStatus(`Filter removed from ${listType} - Remember to save changes`, 'warning');
+            }
+        }
+
+        function saveChanges() {
+            fetch(`${API_PATH}/filters`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    whitelist: whitelistFilters,
+                    blacklist: blacklistFilters,
+                    is_whitelist_mode: systemState.whitelist_enabled
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to save filters');
+                return response.json();
+            })
+            .then(data => {
+                showStatus('Changes saved successfully!', 'success');
+                // Reload to ensure UI is in sync with server
+                loadFilters();
+            })
+            .catch(error => {
+                showStatus('Error saving changes: ' + error.message, 'error');
+                console.error('Error saving filters:', error);
+            });
+        }
+
+        // System control operations
+        function toggleSystem(property, value) {
+            systemState[property] = value;
+            
+            // If we're toggling whitelist mode, switch to the appropriate tab
+            if (property === 'whitelist_enabled') {
+                switchTab(value ? 'whitelist' : 'blacklist');
+            }
+            
+            fetch(`${API_PATH}/system`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ system: systemState })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to update system settings');
+                return response.json();
+            })
+            .then(data => {
+                const prettyProperty = property
+                    .replace('_', ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+                showStatus(`${prettyProperty} ${value ? 'enabled' : 'disabled'}`, 'success');
+            })
+            .catch(error => {
+                showStatus('Error updating system: ' + error.message, 'error');
+                console.error('Error updating system:', error);
+                // Revert the UI state if there was an error
+                document.getElementById(`${property.replace('_', '-')}-toggle`).checked = !value;
+                loadFilters();
+            });
+        }
+
+        // Log operations
+        function toggleLogUpdates() {
+            logUpdatesEnabled = !logUpdatesEnabled;
+            const pauseBtn = document.getElementById('pauseBtn');
+            const updateIndicator = document.getElementById('updateIndicator');
+            const updateStatus = document.getElementById('updateStatus');
+            
+            if (logUpdatesEnabled) {
+                pauseBtn.textContent = 'Pause';
+                pauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                pauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                updateIndicator.classList.add('animate-pulse');
+                updateStatus.textContent = 'Live updating every 2 seconds';
+                // Resume log updates
+                logUpdateInterval = setInterval(loadLogs, 2000);
+            } else {
+                pauseBtn.textContent = 'Resume';
+                pauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                pauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                updateIndicator.classList.remove('animate-pulse');
+                updateStatus.textContent = 'Updates paused';
+                // Clear the interval to stop updates
+                clearInterval(logUpdateInterval);
+            }
+        }
+
+        function colorizeLogLine(line) {
+            // Apply color based on log type
+            if (line.includes('ERROR') || line.includes('WARNING')) {
+                return `<span class="log-line-error">${line}</span>`;
+            } else if (line.includes('Proxying refused on filtered domain')) {
+                return `<span class="log-line-block">${line}</span>`;
+            } else if (line.includes('INFO') || line.includes('NOTICE')) {
+                return `<span class="log-line-info">${line}</span>`;
+            } else if (line.includes('CONNECT')) {
+                return `<span class="log-line-connect">${line}</span>`;
+            } else if (line.includes('BLOCK')) {
+                return `<span class="log-line-block">${line}</span>`;
+            } else {
+                return line;
+            }
+        }
+
+        function loadLogs() {
+            if (!logUpdatesEnabled) return;
+            
+            fetch(`${API_PATH}/logs`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load logs');
+                    return response.text();
+                })
+                .then(logs => {
+                    const logsElement = document.getElementById('proxy-logs');
+                    
+                    if (logs.startsWith("Log file not found")) {
+                        logsElement.innerHTML = logs || "Waiting for logs to be generated...";
+                        return;
+                    }
+                    
+                    // Check if we have new content
+                    if (logs.length > lastLogLength) {
+                        // Get only the new content
+                        const newLogs = logs.substring(lastLogLength);
+                        
+                        // If it's the first load, colorize all lines
+                        if (lastLogLength === 0) {
+                            const colorizedLogs = logs.split('\n')
+                                .map(line => colorizeLogLine(line))
+                                .join('\n');
+                            logsElement.innerHTML = colorizedLogs;
+                        } else {
+                            // Otherwise append and colorize only the new content
+                            const colorizedNewLogs = newLogs.split('\n')
+                                .map(line => colorizeLogLine(line))
+                                .join('\n');
+                            logsElement.innerHTML += colorizedNewLogs;
+                        }
+                        
+                        // Auto-scroll to the bottom if not paused
+                        if (logUpdatesEnabled) {
+                            logsElement.scrollTop = logsElement.scrollHeight;
+                        }
+                        
+                        // Update the stored length
+                        lastLogLength = logs.length;
+                    } else if (logs.length < lastLogLength) {
+                        // Log file was rotated or truncated, reset
+                        const colorizedLogs = logs.split('\n')
+                            .map(line => colorizeLogLine(line))
+                            .join('\n');
+                        logsElement.innerHTML = colorizedLogs;
+                        lastLogLength = logs.length;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading logs:', error);
+                    document.getElementById('proxy-logs').innerHTML = "Error loading logs: " + error.message;
+                });
+        }
+        
+        function clearLogs() {
+            document.getElementById('proxy-logs').innerHTML = "Logs cleared from view.";
+            lastLogLength = 0;
+        }
+
+        // Utility functions
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('status-message');
+            
+            // Clear any existing timeout
+            if (statusTimeout) clearTimeout(statusTimeout);
+            
+            // Set the appropriate class based on type
+            statusElement.className = 'mt-4 p-3 rounded-lg';
+            if (type === 'success') {
+                statusElement.classList.add('bg-green-800', 'text-green-100');
+            } else if (type === 'error') {
+                statusElement.classList.add('bg-red-800', 'text-red-100');
+            } else if (type === 'warning') {
+                statusElement.classList.add('bg-yellow-800', 'text-yellow-100');
+            } else {
+                statusElement.classList.add('bg-blue-800', 'text-blue-100');
+            }
+            
+            statusElement.textContent = message;
+            statusElement.classList.remove('hidden');
+            
+            // Hide the message after 5 seconds
+            statusTimeout = setTimeout(() => {
+                statusElement.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFilters();
+            loadLogs();
+            // Refresh logs every 2 seconds
+            logUpdateInterval = setInterval(loadLogs, 2000);
+        });
+    </script>
+</body>
+</html> 
