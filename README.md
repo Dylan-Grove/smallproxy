@@ -1,6 +1,6 @@
 # SmallProxy
 
-A lightweight proxy server with a web interface for managing filters. Powered by [TinyProxy](https://tinyproxy.github.io/).
+A lightweight proxy server with a web interface for managing filters. Perfect for blocking websites quickly for your clients. Powered by [TinyProxy](https://tinyproxy.github.io/).
 
 ## Features
 
@@ -64,6 +64,8 @@ The following domains are allowed by default in whitelist mode:
 ## Security Note
 
 The web interface is accessible on port 5000. Make sure to restrict access to authorized users only if deploying in a shared environment.
+
+NOTE: This is meant strictly for testing and lab purposes. Run this in production at your own risk.
 
 ## Using the Proxy
 
