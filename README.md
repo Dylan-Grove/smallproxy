@@ -23,6 +23,7 @@ A lightweight proxy server with a web interface for managing filters. Powered by
   - Live-updating log viewer that automatically shows new log entries
   - Clear log view functionality for better readability
   - Automatic log rotation handling
+  - Color-coded log entries for easy identification of different event types
 
 - **Modern UI**:
   - Clean, responsive design for desktop and mobile
@@ -52,26 +53,13 @@ docker run -d --name smallproxy -p 8888:8888 -p 5000:5000 smallproxy
 
 ### Default Blacklist
 The following domains are blocked by default in blacklist mode:
-- facebook.com
-- instagram.com
-- tiktok.com
-- twitter.com
-- reddit.com
-- youtube.com
-- netflix.com
-- hulu.com
-- disney.com
-- disneyplus.com
-- twitch.tv
+- squareup.com
+- api.squareup.com
+- connect.squareup.com
 
 ### Default Whitelist
 The following domains are allowed by default in whitelist mode:
 - google.com
-- github.com
-- stackoverflow.com
-- docs.microsoft.com
-- developer.mozilla.org
-- wikipedia.org
 
 ## Security Note
 
@@ -88,3 +76,11 @@ The web interface is accessible on port 5000. Make sure to restrict access to au
 ## Acknowledgments
 
 SmallProxy is powered by [TinyProxy](https://tinyproxy.github.io/), a lightweight HTTP/HTTPS proxy daemon for POSIX operating systems.
+
+## Repository Info
+
+This repository includes:
+- `.gitignore` - Excludes common system files and development artifacts
+- `CHANGELOG.md` - Documents all significant changes to the project
+- `Dockerfile` - Container definition for building and running SmallProxy
+- `default.json` - Default configuration file with initial whitelist and blacklist settings
